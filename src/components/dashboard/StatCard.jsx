@@ -1,16 +1,29 @@
-export default function StatCard({title,value}) {
-
+export default function StatCard({ title, value }) {
   return (
-    <div className="bg-[#ededed] p-4 rounded-xl shadow">
-
-      <p className="text-gray-500 text-sm">
+    <div className="
+      bg-[#ededed]
+      p-4 sm:p-5 lg:p-6
+      rounded-xl
+      shadow-sm hover:shadow-md
+      transition
+      w-full
+    ">
+      <p className="
+        text-gray-500
+        text-xs sm:text-sm lg:text-base
+        truncate
+      ">
         {title}
       </p>
 
-      <h2 className="text-2xl font-bold mt-2">
+      <h2 className="
+        font-bold
+        mt-2
+        text-lg sm:text-2xl lg:text-3xl
+        wrap-break-word
+      ">
         {value}
       </h2>
-
     </div>
   );
 }
