@@ -1,7 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { auth, provider } from "../firebase";
+import { signInWithPopup } from "firebase/auth";
 
 export default function SignIn() {
+    const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
@@ -20,328 +23,53 @@ export default function SignIn() {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) console.log("Login details ready for backend");
+    navigate("/dashboard")
   };
+
+  const handleGoogleLogin = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+    console.log("User:", result.user);
+    navigate("/dashboard")
+  } catch (error) {
+    console.error("Google login error:", error);
+  }
+};
 
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        .signin-root {
-          min-height: 100vh;
-          display: flex;
-          font-family: 'DM Sans', sans-serif;
-          background-color: #0e1628;
-          overflow: hidden;
-          position: relative;
-        }
-
-        /* Animated background blobs */
-        .bg-blob {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(80px);
-          opacity: 0.18;
-          animation: drift 12s ease-in-out infinite alternate;
-        }
-        .bg-blob-1 {
-          width: 500px; height: 500px;
-          background: #87aece;
-          top: -100px; left: -100px;
-          animation-delay: 0s;
-        }
-        .bg-blob-2 {
-          width: 500px; height: 500px;
-          background: #afd06e;
-          bottom: -100px; right: 15%;
-          opacity: 0.28;
-          animation-delay: -4s;
-        }
-        .bg-blob-3 {
-          width: 320px; height: 320px;
-          background: #407118;
-          top: 40%; right: -60px;
-          opacity: 0.3;
-          animation-delay: -8s;
-        }
-        .bg-blob-4 {
-          width: 260px; height: 260px;
-          background: #afd06e;
-          top: 10%; left: 35%;
-          opacity: 0.12;
-          animation-delay: -2s;
-        }
-
+        .font-playfair { font-family: 'Playfair Display', serif; }
+        .font-dm { font-family: 'DM Sans', sans-serif; }
         @keyframes drift {
           from { transform: translate(0, 0) scale(1); }
           to   { transform: translate(30px, 20px) scale(1.08); }
         }
-
-        /* Grid texture overlay */
-        .bg-grid {
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(rgba(175,208,110,0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(175,208,110,0.04) 1px, transparent 1px);
-          background-size: 40px 40px;
-          pointer-events: none;
-        }
-
-        /* Floating leaf decorations */
-        .leaf {
-          position: absolute;
-          opacity: 0.07;
-          pointer-events: none;
-          animation: leaf-sway 8s ease-in-out infinite alternate;
-        }
-        .leaf-1 { top: 8%; right: 12%; animation-delay: 0s; }
-        .leaf-2 { bottom: 12%; left: 8%; animation-delay: -3s; transform: rotate(120deg); }
-        .leaf-3 { top: 55%; left: 42%; animation-delay: -5s; transform: rotate(60deg); opacity: 0.05; }
-
         @keyframes leaf-sway {
           from { transform: rotate(0deg) scale(1); }
           to   { transform: rotate(8deg) scale(1.05); }
-        }
-
-        /* Left panel */
-        .left-panel {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 60px 64px;
-          position: relative;
-          z-index: 2;
-        }
-
-        .brand-pill {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: rgba(175, 208, 110, 0.1);
-          border: 1px solid rgba(175, 208, 110, 0.25);
-          border-radius: 100px;
-          padding: 6px 14px;
-          width: fit-content;
-          margin-bottom: 40px;
-        }
-        .brand-pill-dot {
-          width: 7px; height: 7px;
-          background: #afd06e;
-          border-radius: 50%;
-          box-shadow: 0 0 8px #afd06e;
-          animation: pulse-dot 2s ease-in-out infinite;
         }
         @keyframes pulse-dot {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.6; transform: scale(0.8); }
         }
-        .brand-pill-text {
-          font-size: 12px;
-          font-weight: 500;
-          color: #afd06e;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-
-        .hero-title {
-          font-family: 'Playfair Display', serif;
-          font-size: clamp(36px, 4vw, 52px);
-          font-weight: 600;
-          color: #f0f4ff;
-          line-height: 1.15;
-          margin-bottom: 20px;
-        }
-        .hero-title span {
-          color: #afd06e;
-        }
-
-        .hero-sub {
-          font-size: 15px;
-          color: rgba(240,244,255,0.45);
-          line-height: 1.7;
-          max-width: 340px;
-          margin-bottom: 56px;
-        }
-
-        .stats-row {
-          display: flex;
-          gap: 36px;
-        }
-        .stat-item {}
-        .stat-value {
-          font-family: 'Playfair Display', serif;
-          font-size: 28px;
-          color: #afd06e;
-          font-weight: 600;
-        }
-        .stat-label {
-          font-size: 11px;
-          color: rgba(240,244,255,0.35);
-          text-transform: uppercase;
-          letter-spacing: 0.1em;
-          margin-top: 2px;
-        }
-
-        /* Divider */
-        .panel-divider {
-          width: 1px;
-          background: linear-gradient(to bottom, transparent, rgba(135,174,206,0.2) 30%, rgba(135,174,206,0.2) 70%, transparent);
-          position: relative;
-          z-index: 2;
-          margin: 48px 0;
-        }
-
-        /* Right panel / form area */
-        .right-panel {
-          width: 460px;
-          flex-shrink: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 48px 40px;
-          position: relative;
-          z-index: 2;
-        }
-
-        .form-card {
-          width: 100%;
-          background: rgba(64,113,24,0.06);
-          border: 1px solid rgba(175,208,110,0.18);
-          border-radius: 24px;
-          padding: 44px 40px;
-          backdrop-filter: blur(20px);
-          position: relative;
-          overflow: hidden;
-        }
-
-        .form-card::before {
+        .animate-drift-1 { animation: drift 12s ease-in-out infinite alternate; }
+        .animate-drift-2 { animation: drift 12s ease-in-out infinite alternate; animation-delay: -4s; }
+        .animate-drift-3 { animation: drift 12s ease-in-out infinite alternate; animation-delay: -8s; }
+        .animate-drift-4 { animation: drift 12s ease-in-out infinite alternate; animation-delay: -2s; }
+        .animate-leaf-1 { animation: leaf-sway 8s ease-in-out infinite alternate; }
+        .animate-leaf-2 { animation: leaf-sway 8s ease-in-out infinite alternate; animation-delay: -3s; }
+        .animate-leaf-3 { animation: leaf-sway 8s ease-in-out infinite alternate; animation-delay: -5s; }
+        .animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+        .card-top-border::before {
           content: '';
           position: absolute;
           top: 0; left: 0; right: 0;
           height: 2px;
           background: linear-gradient(90deg, transparent, #407118 20%, #afd06e 55%, #87aece 80%, transparent);
         }
-
-        .form-eyebrow {
-          font-size: 11px;
-          font-weight: 500;
-          color: #afd06e;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin-bottom: 10px;
-        }
-
-        .form-title {
-          font-family: 'Playfair Display', serif;
-          font-size: 26px;
-          color: #f0f4ff;
-          font-weight: 600;
-          margin-bottom: 6px;
-        }
-
-        .form-subtitle {
-          font-size: 13px;
-          color: rgba(240,244,255,0.38);
-          margin-bottom: 36px;
-          line-height: 1.5;
-        }
-
-        .field-group {
-          margin-bottom: 16px;
-        }
-
-        .field-label {
-          display: block;
-          font-size: 11px;
-          font-weight: 500;
-          color: rgba(240,244,255,0.5);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-
-        .field-wrap {
-          position: relative;
-        }
-
-        .field-icon {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          opacity: 0.4;
-          transition: opacity 0.2s;
-          pointer-events: none;
-          color: #87aece;
-        }
-
-        .field-input {
-          width: 100%;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(135,174,206,0.2);
-          border-radius: 12px;
-          padding: 13px 14px 13px 40px;
-          font-size: 14px;
-          font-family: 'DM Sans', sans-serif;
-          color: #f0f4ff;
-          transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-          outline: none;
-        }
-        .field-input::placeholder { color: rgba(240,244,255,0.2); }
-        .field-input:focus {
-          border-color: #87aece;
-          background: rgba(135,174,206,0.07);
-          box-shadow: 0 0 0 3px rgba(135,174,206,0.1);
-        }
-        .field-input.has-error {
-          border-color: rgba(255,100,100,0.5);
-        }
-        .field-input:focus + .field-focus-line,
-        .field-wrap:focus-within .field-icon { opacity: 1; }
-
-        .error-msg {
-          font-size: 11px;
-          color: #ff8080;
-          margin-top: 5px;
-          padding-left: 4px;
-        }
-
-        .forgot-link {
-          display: block;
-          text-align: right;
-          font-size: 12px;
-          color: #afd06e;
-          margin-top: -6px;
-          margin-bottom: 28px;
-          cursor: pointer;
-          text-decoration: none;
-          transition: opacity 0.2s;
-          width: fit-content;
-          margin-left: auto;
-        }
-        .forgot-link:hover { opacity: 0.7; }
-
-        .btn-primary {
-          width: 100%;
-          background: linear-gradient(135deg, #407118 0%, #5a9e24 100%);
-          color: #f0f4ff;
-          border: 1px solid rgba(175,208,110,0.3);
-          border-radius: 12px;
-          padding: 14px;
-          font-size: 14px;
-          font-weight: 500;
-          font-family: 'DM Sans', sans-serif;
-          cursor: pointer;
-          transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
-          letter-spacing: 0.03em;
-          position: relative;
-          overflow: hidden;
-        }
-        .btn-primary::after {
+        .btn-primary-shine::after {
           content: '';
           position: absolute;
           inset: 0;
@@ -349,170 +77,102 @@ export default function SignIn() {
           opacity: 0;
           transition: opacity 0.2s;
         }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(64,113,24,0.45); }
-        .btn-primary:hover::after { opacity: 1; }
-        .btn-primary:active { transform: translateY(0); }
-
-        .divider-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin: 20px 0;
+        .btn-primary-shine:hover::after { opacity: 1; }
+        .bg-grid-pattern {
+          background-image:
+            linear-gradient(rgba(175,208,110,0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(175,208,110,0.04) 1px, transparent 1px);
+          background-size: 40px 40px;
         }
-        .divider-line {
-          flex: 1;
-          height: 1px;
-          background: rgba(175,208,110,0.15);
+        .field-input:focus {
+          border-color: #87aece;
+          background: rgba(135,174,206,0.07);
+          box-shadow: 0 0 0 3px rgba(135,174,206,0.1);
         }
-        .divider-text {
-          font-size: 11px;
-          color: rgba(240,244,255,0.25);
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-        }
-
-        .btn-google {
-          width: 100%;
-          background: transparent;
-          border: 1px solid rgba(135,174,206,0.2);
-          border-radius: 12px;
-          padding: 13px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          font-size: 13px;
-          font-family: 'DM Sans', sans-serif;
-          color: rgba(240,244,255,0.6);
-          cursor: pointer;
-          transition: border-color 0.2s, background 0.2s, color 0.2s;
-        }
-        .btn-google:hover {
-          border-color: rgba(135,174,206,0.45);
-          background: rgba(135,174,206,0.06);
-          color: rgba(240,244,255,0.9);
-        }
-
-        .signup-row {
-          text-align: center;
-          font-size: 12px;
-          color: rgba(240,244,255,0.3);
-          margin-top: 24px;
-        }
-        .signup-row a {
-          color: #afd06e;
-          text-decoration: none;
-          font-weight: 500;
-          transition: opacity 0.2s;
-        }
-        .signup-row a:hover { opacity: 0.7; }
-
-        /* Decorative rings */
-        .deco-ring {
-          position: absolute;
-          bottom: -30px;
-          right: -30px;
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          border: 1px solid rgba(175,208,110,0.14);
-        }
-        .deco-ring-2 {
-          position: absolute;
-          bottom: -60px;
-          right: -60px;
-          width: 180px;
-          height: 180px;
-          border-radius: 50%;
-          border: 1px solid rgba(64,113,24,0.12);
-        }
-
-        @media (max-width: 800px) {
-          .left-panel { display: none; }
-          .panel-divider { display: none; }
-          .signin-root { justify-content: center; background: #0e1628; }
-          .right-panel { width: 100%; padding: 24px 20px; }
-        }
+        .field-icon-wrap:focus-within .field-icon { opacity: 1; }
       `}</style>
 
-      <div className="signin-root">
-        {/* Background effects */}
-        <div className="bg-blob bg-blob-1" />
-        <div className="bg-blob bg-blob-2" />
-        <div className="bg-blob bg-blob-3" />
-        <div className="bg-blob bg-blob-4" />
-        <div className="bg-grid" />
+      <div className="font-dm relative min-h-screen flex overflow-hidden bg-[#0e1628]">
+
+        {/* Background blobs */}
+        <div className="animate-drift-1 absolute w-[500px] h-[500px] rounded-full bg-[#87aece] opacity-[0.18] blur-[80px] -top-[100px] -left-[100px] pointer-events-none" />
+        <div className="animate-drift-2 absolute w-[500px] h-[500px] rounded-full bg-[#afd06e] opacity-[0.28] blur-[80px] -bottom-[100px] right-[15%] pointer-events-none" />
+        <div className="animate-drift-3 absolute w-[320px] h-[320px] rounded-full bg-[#407118] opacity-30 blur-[80px] top-[40%] -right-[60px] pointer-events-none" />
+        <div className="animate-drift-4 absolute w-[260px] h-[260px] rounded-full bg-[#afd06e] opacity-[0.12] blur-[80px] top-[10%] left-[35%] pointer-events-none" />
+        <div className="bg-grid-pattern absolute inset-0 pointer-events-none" />
 
         {/* Leaf decorations */}
-        <svg className="leaf leaf-1" width="180" height="180" viewBox="0 0 100 100" fill="none">
+        <svg className="animate-leaf-1 absolute top-[8%] right-[12%] opacity-[0.07] pointer-events-none" width="180" height="180" viewBox="0 0 100 100" fill="none">
           <path d="M50 5 C80 5, 95 30, 95 50 C95 75, 70 95, 50 95 C30 95, 5 75, 5 50 C5 25, 20 5, 50 5Z" fill="#afd06e"/>
           <path d="M50 5 L50 95" stroke="#407118" strokeWidth="2"/>
           <path d="M50 30 C60 25, 75 30, 80 40" stroke="#407118" strokeWidth="1.5" fill="none"/>
           <path d="M50 50 C60 45, 78 48, 82 58" stroke="#407118" strokeWidth="1.5" fill="none"/>
           <path d="M50 40 C40 35, 25 38, 20 48" stroke="#407118" strokeWidth="1.5" fill="none"/>
         </svg>
-        <svg className="leaf leaf-2" width="140" height="140" viewBox="0 0 100 100" fill="none">
+        <svg className="animate-leaf-2 absolute bottom-[12%] left-[8%] opacity-[0.07] pointer-events-none rotate-[120deg]" width="140" height="140" viewBox="0 0 100 100" fill="none">
           <path d="M50 5 C80 5, 95 30, 95 50 C95 75, 70 95, 50 95 C30 95, 5 75, 5 50 C5 25, 20 5, 50 5Z" fill="#afd06e"/>
           <path d="M50 5 L50 95" stroke="#407118" strokeWidth="2"/>
           <path d="M50 35 C62 28, 78 33, 83 45" stroke="#407118" strokeWidth="1.5" fill="none"/>
           <path d="M50 55 C38 48, 22 53, 18 65" stroke="#407118" strokeWidth="1.5" fill="none"/>
         </svg>
-        <svg className="leaf leaf-3" width="220" height="220" viewBox="0 0 100 100" fill="none">
+        <svg className="animate-leaf-3 absolute top-[55%] left-[42%] opacity-[0.05] pointer-events-none rotate-[60deg]" width="220" height="220" viewBox="0 0 100 100" fill="none">
           <path d="M50 5 C80 5, 95 30, 95 50 C95 75, 70 95, 50 95 C30 95, 5 75, 5 50 C5 25, 20 5, 50 5Z" fill="#afd06e"/>
           <path d="M50 5 L50 95" stroke="#407118" strokeWidth="2"/>
         </svg>
 
-        {/* Left brand panel */}
-        <div className="left-panel">
-          <div className="brand-pill">
-            <div className="brand-pill-dot" />
-            <span className="brand-pill-text">Farm Flow Dashboard</span>
+        {/* Left: Brand panel */}
+        <div className="flex-1 hidden md:flex flex-col justify-center px-16 py-[60px] relative z-10">
+          <div className="inline-flex items-center gap-2 bg-[rgba(175,208,110,0.1)] border border-[rgba(175,208,110,0.25)] rounded-full px-3.5 py-1.5 w-fit mb-10">
+            <div className="animate-pulse-dot w-[7px] h-[7px] bg-[#afd06e] rounded-full shadow-[0_0_8px_#afd06e]" />
+            <span className="text-xs font-medium text-[#afd06e] tracking-[0.08em] uppercase">Farm Flow Dashboard</span>
           </div>
 
-          <h1 className="hero-title">
+          <h1 className="font-playfair text-[clamp(36px,4vw,52px)] font-semibold text-[#f0f4ff] leading-[1.15] mb-5">
             Grow smarter.<br />
-            <span>Harvest better.</span>
+            <span className="text-[#afd06e]">Harvest better.</span>
           </h1>
 
-          <p className="hero-sub">
+          <p className="text-[15px] text-[rgba(240,244,255,0.45)] leading-[1.7] max-w-[340px] mb-14">
             Monitor your aquaponics ecosystem in real time; water quality, fish health, plant cycles, and yield analytics, all in one place.
           </p>
 
-          <div className="stats-row">
-            <div className="stat-item">
-              <div className="stat-value">98.4%</div>
-              <div className="stat-label">System uptime</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">12k+</div>
-              <div className="stat-label">Active growers</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-value">4.9★</div>
-              <div className="stat-label">Avg rating</div>
-            </div>
+          <div className="flex gap-9">
+            {[
+              { value: "98.4%", label: "System uptime" },
+              { value: "12k+",  label: "Active growers" },
+              { value: "4.9★",  label: "Avg rating" },
+            ].map(({ value, label }) => (
+              <div key={label}>
+                <div className="font-playfair text-[28px] text-[#afd06e] font-semibold">{value}</div>
+                <div className="text-[11px] text-[rgba(240,244,255,0.35)] uppercase tracking-[0.1em] mt-0.5">{label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Vertical divider */}
-        <div className="panel-divider" />
+        <div
+          className="hidden md:block w-px my-12 relative z-10 shrink-0"
+          style={{ background: "linear-gradient(to bottom, transparent, rgba(135,174,206,0.2) 30%, rgba(135,174,206,0.2) 70%, transparent)" }}
+        />
 
-        {/* Right form panel */}
-        <div className="right-panel">
-          <div className="form-card">
-            <div className="deco-ring" />
-            <div className="deco-ring-2" />
+        {/* Right: Form panel */}
+        <div className="w-full md:w-115 shrink-0 flex items-center justify-center px-5 py-12 md:px-10 relative z-10">
+          <div className="card-top-border relative w-full bg-[rgba(64,113,24,0.06)] border border-[rgba(175,208,110,0.18)] rounded-3xl px-10 py-11 backdrop-blur-xl overflow-hidden">
 
-            
-            <div className="form-title">Sign In</div>
-            <div className="form-subtitle">Enter your credentials to access your dashboard</div>
+            {/* Deco rings — bottom-right this time */}
+            <div className="absolute -bottom-7.5 -right-7.5 w-30 h-30 rounded-full border border-[rgba(175,208,110,0.14)]" />
+            <div className="absolute -bottom-15 -right-15 w-45 h-45 rounded-full border border-[rgba(64,113,24,0.12)]" />
+
+            <div className="font-playfair text-[26px] text-[#f0f4ff] font-semibold mb-1.5">Sign In</div>
+            <div className="text-[13px] text-[rgba(240,244,255,0.38)] mb-9 leading-relaxed">Enter your credentials to access your dashboard</div>
 
             <form onSubmit={handleSubmit}>
               {/* Email */}
-              <div className="field-group">
-                <label className="field-label">Email Address</label>
-                <div className="field-wrap">
-                  <span className="field-icon">
+              <div className="mb-4">
+                <label className="block text-[11px] font-medium text-[rgba(240,244,255,0.5)] tracking-[0.08em] uppercase mb-2">Email Address</label>
+                <div className="field-icon-wrap relative">
+                  <span className="field-icon absolute left-3.5 top-1/2 -translate-y-1/2 opacity-40 transition-opacity duration-200 pointer-events-none text-[#87aece]">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <rect x="2" y="4" width="20" height="16" rx="3"/>
                       <path d="M2 8l10 6 10-6"/>
@@ -521,21 +181,21 @@ export default function SignIn() {
                   <input
                     type="email"
                     placeholder="youremail@africau.edu"
-                    className={`field-input${errors.email ? " has-error" : ""}`}
+                    className={`field-input w-full bg-[rgba(255,255,255,0.04)] border rounded-xl py-[13px] pl-10 pr-3.5 text-sm text-[#f0f4ff] outline-none transition-all duration-200 placeholder:text-[rgba(240,244,255,0.2)] ${errors.email ? "border-[rgba(255,100,100,0.5)]" : "border-[rgba(135,174,206,0.2)]"}`}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onFocus={() => setFocused("email")}
                     onBlur={() => setFocused("")}
                   />
                 </div>
-                {errors.email && <div className="error-msg">{errors.email}</div>}
+                {errors.email && <div className="text-[11px] text-[#ff8080] mt-1 pl-1">{errors.email}</div>}
               </div>
 
               {/* Password */}
-              <div className="field-group">
-                <label className="field-label">Password</label>
-                <div className="field-wrap">
-                  <span className="field-icon">
+              <div className="mb-4">
+                <label className="block text-[11px] font-medium text-[rgba(240,244,255,0.5)] tracking-[0.08em] uppercase mb-2">Password</label>
+                <div className="field-icon-wrap relative">
+                  <span className="field-icon absolute left-3.5 top-1/2 -translate-y-1/2 opacity-40 transition-opacity duration-200 pointer-events-none text-[#87aece]">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                       <rect x="3" y="11" width="18" height="11" rx="2"/>
                       <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -544,30 +204,44 @@ export default function SignIn() {
                   <input
                     type="password"
                     placeholder="••••••••"
-                    className={`field-input${errors.password ? " has-error" : ""}`}
+                    className={`field-input w-full bg-[rgba(255,255,255,0.04)] border rounded-xl py-[13px] pl-10 pr-3.5 text-sm text-[#f0f4ff] outline-none transition-all duration-200 placeholder:text-[rgba(240,244,255,0.2)] ${errors.password ? "border-[rgba(255,100,100,0.5)]" : "border-[rgba(135,174,206,0.2)]"}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onFocus={() => setFocused("password")}
                     onBlur={() => setFocused("")}
                   />
                 </div>
-                {errors.password && <div className="error-msg">{errors.password}</div>}
+                {errors.password && <div className="text-[11px] text-[#ff8080] mt-1 pl-1">{errors.password}</div>}
               </div>
 
-              <a href="/forgotpassword" className="forgot-link">Forgot password?</a>
+              <a
+                href="/forgotpassword"
+                className="block text-right text-xs text-[#afd06e] no-underline ml-auto w-fit -mt-1.5 mb-7 transition-opacity duration-200 hover:opacity-70"
+              >
+                Forgot password?
+              </a>
 
-              <button type="submit" className="btn-primary">
+              <button
+                type="submit"
+                className="btn-primary-shine relative w-full bg-linear-to-br from-[#407118] to-[#5a9e24] text-[#f0f4ff] border border-[rgba(175,208,110,0.3)] rounded-xl py-3.5 text-sm font-medium tracking-wide cursor-pointer transition-all duration-150 overflow-hidden hover:-translate-y-px hover:shadow-[0_8px_24px_rgba(64,113,24,0.45)] active:translate-y-0"
+              >
                 Sign In to Dashboard
               </button>
             </form>
 
-            <div className="divider-row">
-              <div className="divider-line" />
-              <span className="divider-text">or</span>
-              <div className="divider-line" />
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-[rgba(175,208,110,0.15)]" />
+              <span className="text-[11px] text-[rgba(240,244,255,0.25)] tracking-[0.08em] uppercase">or</span>
+              <div className="flex-1 h-px bg-[rgba(175,208,110,0.15)]" />
             </div>
 
-            <button type="button" className="btn-google">
+            {/* Google button */}
+            <button
+              type="button"
+               onClick={handleGoogleLogin}
+              className="w-full bg-transparent border border-[rgba(135,174,206,0.2)] rounded-xl px-4 py-3.25 flex items-center justify-center gap-2.5 text-[13px] text-[rgba(82,117,214,0.6)] cursor-pointer transition-all duration-200 hover:border-[rgba(135,174,206,0.45)] hover:bg-[rgba(135,174,206,0.06)]"
+            >
               <svg width="16" height="16" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -577,9 +251,11 @@ export default function SignIn() {
               Continue with Google
             </button>
 
-            <div className="signup-row">
+            <div className="text-center text-xs text-[rgba(240,244,255,0.3)] mt-6">
               Don't have an account?{" "}
-              <Link to="/signup">Create one here</Link>
+              <Link to="/signup" className="text-[#afd06e] no-underline font-medium transition-opacity duration-200 hover:opacity-70">
+                Create one here
+              </Link>
             </div>
           </div>
         </div>

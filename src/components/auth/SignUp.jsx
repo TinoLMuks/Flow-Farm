@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { auth, provider } from "../firebase";
-import { signInWithPopup } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 const Link = ({ to, className, children }) => (
   <a href={to} className={className}>{children}</a>
@@ -12,15 +11,6 @@ export default function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [focused, setFocused] = useState("");
-
-  const handleGoogleLogin = async () => {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    console.log(result.user);
-  } catch (error) {
-    console.error("Google login error:", error);
-  }
-};
 
   const validate = () => {
     let newErrors = {};
@@ -138,7 +128,6 @@ export default function SignUp() {
             {/* Google button */}
             <button
               type="button"
-               onClick={handleGoogleLogin}
               className="w-full bg-transparent border border-[rgba(135,174,206,0.2)] rounded-xl px-4 py-3.25 flex items-center justify-center gap-2.5 text-[13px] text-[rgba(17,64,219,0.6)] cursor-pointer transition-all duration-200 mb-5 hover:border-[rgba(135,174,206,0.45)] hover:bg-[rgba(135,174,206,0.06)]"
             >
               <svg width="16" height="16" viewBox="0 0 24 24">
