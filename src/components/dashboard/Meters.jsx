@@ -153,16 +153,16 @@ export default function Meters() {
 
   return (
     <div style={{ padding: "28px", background: "#f0f2f5", minHeight: "100%" }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em",
-          color: "#1a2035", margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
-          Environment
-        </h1>
-        <p style={{ fontSize: 13, color: "#8a94a6", marginTop: 4,
-          fontFamily: "'DM Sans', sans-serif" }}>
-          Real-time sensor readings
-        </p>
-      </div>
+     <div style={{ marginBottom: 24, textAlign: "center" }}>
+  <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em",
+    color: "#1a2035", margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+    Environment
+  </h1>
+  <p style={{ fontSize: 13, color: "#8a94a6", marginTop: 4,
+    fontFamily: "'DM Sans', sans-serif" }}>
+    Real-time sensor readings
+  </p>
+</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         <MeterCard
