@@ -1,0 +1,158 @@
+erDiagram
+    roles ||--o{ users : "assigns"
+    users ||--o{ password_resets : "requests"
+    users ||--o{ verification_codes : "receives"
+    users ||--o{ tanks : "creates"
+    users ||--o{ feeding_logs : "logs"
+    users ||--o{ audit_log : "generates"
+    users ||--o{ messages : "receives"
+
+    tanks ||--o{ sensors : "contains"
+    tanks ||--o{ sensor_readings : "stores"
+    tanks ||--o{ thresholds : "configures"
+    tanks ||--o{ alerts : "triggers"
+    tanks ||--o{ feeding_schedules : "schedules"
+    tanks ||--o{ feeding_logs : "tracks"
+    tanks ||--o{ system_health : "monitors"
+
+    sensor_types ||--o{ sensors : "classifies"
+    sensor_types ||--o{ sensor_readings : "categorizes"
+    sensor_types ||--o{ thresholds : "bounds"
+    sensor_types ||--o{ alerts : "identifies"
+
+    sensors ||--o{ sensor_readings : "produces"
+    sensor_readings ||--o{ alerts : "triggers"
+    feeding_schedules ||--o{ feeding_logs : "executes"
+
+    roles {
+        int role_id PK
+        varchar role_name
+        varchar description
+    }
+
+    users {
+        int user_id PK
+        varchar full_name
+        varchar email
+        varchar password_hash
+        varchar google_id
+        varchar phone_number
+        int role_id FK
+        boolean is_verified
+        timestamp last_login
+    }
+
+    tanks {
+        int tank_id PK
+        varchar tank_name
+        varchar location
+        varchar fish_species
+        decimal capacity_litres
+        boolean is_active
+        int created_by FK
+    }
+
+    sensor_types {
+        int sensor_type_id PK
+        varchar type_name
+        varchar unit
+        decimal min_safe_value
+        decimal max_safe_value
+    }
+
+    sensors {
+        int sensor_id PK
+        int tank_id FK
+        int sensor_type_id FK
+        varchar device_label
+        varchar esp32_device_id
+        boolean is_active
+    }
+
+    sensor_readings {
+        bigint reading_id PK
+        int sensor_id FK
+        int tank_id FK
+        int sensor_type_id FK
+        decimal value
+        timestamp recorded_at
+        timestamp received_at
+    }
+
+    thresholds {
+        int threshold_id PK
+        int tank_id FK
+        int sensor_type_id FK
+        decimal min_value
+        decimal max_value
+        int updated_by FK
+    }
+
+    alerts {
+        int alert_id PK
+        int tank_id FK
+        int sensor_type_id FK
+        bigint reading_id FK
+        enum alert_type
+        varchar message
+        decimal value_recorded
+        enum status
+        int acknowledged_by FK
+    }
+
+    feeding_schedules {
+        int schedule_id PK
+        int tank_id FK
+        time feed_time
+        decimal feed_amount_g
+        boolean is_active
+    }
+
+    feeding_logs {
+        int log_id PK
+        int schedule_id FK
+        int tank_id FK
+        int fed_by FK
+        enum method
+        timestamp fed_at
+    }
+
+    system_health {
+        int health_id PK
+        int tank_id FK
+        int overall_score
+        enum temp_status
+        enum ph_status
+        enum water_level_status
+    }
+
+    audit_log {
+        bigint log_id PK
+        int user_id FK
+        varchar action
+        varchar entity_type
+        json details
+    }
+
+    messages {
+        int message_id PK
+        int sender_id FK
+        int recipient_id FK
+        varchar subject
+        text body
+        boolean is_read
+    }
+
+    password_resets {
+        int reset_id PK
+        int user_id FK
+        varchar reset_token
+        timestamp expires_at
+    }
+
+    verification_codes {
+        int code_id PK
+        int user_id FK
+        varchar code
+        timestamp expires_at
+    }

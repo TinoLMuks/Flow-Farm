@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 const CX = 70, CY = 70, R = 58;
 const START_ANG = Math.PI * 1.1;
 const END_ANG   = Math.PI * 1.9;
@@ -147,9 +149,28 @@ function MeterCard({ label, value, unit, min, max, step, rangeLabel, onChange, g
 }
 
 export default function Meters() {
-  const [ph,    setPh]    = useState(7.2);
-  const [temp,  setTemp]  = useState(26);
+  const [ph,    setPh]    = useState(7.0);
+  const [temp,  setTemp]  = useState(25);
   const [level, setLevel] = useState(65);
+
+  useEffect(() => {
+    async function fetchReadings() {
+      try {
+        const res = await fetch(`${API_URL}/sensors/readings/latest/1`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          for (const r of json.data) {
+            if (r.type_name === "ph") setPh(parseFloat(r.value));
+            if (r.type_name === "temperature") setTemp(parseFloat(r.value));
+            if (r.type_name === "water_level") setLevel(parseFloat(r.value));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch meter readings:", err);
+      }
+    }
+    fetchReadings();
+  }, []);
 
   return (
     <div style={{ padding: "28px", background: "#f0f2f5", minHeight: "100%" }}>

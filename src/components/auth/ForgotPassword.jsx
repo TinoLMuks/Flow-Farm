@@ -1,7 +1,5 @@
 import { useState } from "react";
-
-// Mock useNavigate for standalone preview
-const useNavigate = () => (path) => console.log("Navigating to:", path);
+import { useNavigate } from "react-router-dom";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");

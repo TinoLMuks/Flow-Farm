@@ -19,9 +19,9 @@ ChartJS.register(
   Tooltip
 );
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 export default function PerformanceChart() {
-  // STATE MANAGEMENT
-  // We initialize with empty arrays so the chart doesn't crash before data arrives
   const [chartData, setChartData] = useState({
     labels: [],
     datasets: []
@@ -29,20 +29,22 @@ export default function PerformanceChart() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  //DATA FETCHING (INTEGRATION LAYER)
   useEffect(() => {
-    // Calling live Azure Backend
-    fetch("https://flowfarm-backend-e7e0b6bgdcbvf9be.switzerlandnorth-01.azurewebsites.net/api/sensors")
+    const now = new Date();
+    const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+
+    fetch(`${API_URL}/sensors/readings/range/1?start=${sixHoursAgo.toISOString()}&end=${now.toISOString()}`)
       .then((response) => {
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         return response.json();
       })
-      .then((apiData) => {
-        // MAPPING BACKEND DATA TO FRONTEND CHART
+      .then((json) => {
+        if (!json.success) throw new Error("API returned error");
+        const apiData = json.data;
         setChartData({
-          labels: apiData.labels, // Expected: ["9am", "10am", ...]
+          labels: apiData.labels,
           datasets: [
             {
               label: "Temperature",
@@ -77,9 +79,8 @@ export default function PerformanceChart() {
         setLoading(false);
       })
       .catch((err) => {
-        // ERROR HANDLING (.catch)
         console.error("Fetch error:", err);
-        setError("⚠️ System Offline: Unable to load live sensor data.");
+        setError("Unable to load live sensor data.");
         setLoading(false);
       });
   }, []);
@@ -114,7 +115,6 @@ export default function PerformanceChart() {
     }
   };
 
-  // CONDITIONAL RENDERING
   if (loading) {
     return (
       <div className="bg-[#ededed] p-6 rounded-2xl shadow-md flex justify-center items-center h-64">
@@ -129,7 +129,7 @@ export default function PerformanceChart() {
         <h2 className="text-lg font-bold mb-4 text-[#1d2a62]">Performance</h2>
         <div className="flex flex-col items-center justify-center h-48 text-center">
           <p className="text-red-600 font-medium mb-2">{error}</p>
-          <button 
+          <button
             onClick={() => window.location.reload()}
             className="text-xs bg-[#1d2a62] text-white px-3 py-1 rounded-full hover:bg-opacity-80"
           >

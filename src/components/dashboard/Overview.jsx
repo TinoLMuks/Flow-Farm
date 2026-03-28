@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import StatCard from "./StatCard";
-import AdviceCard from "./AdviceCard";
 import RecentIssuesTable from "./RecentIssuesTable";
 import Meters from "./Meters";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export default function Overview() {
   const now = new Date();
@@ -10,6 +12,46 @@ export default function Overview() {
     month: "long",
     day: "numeric",
   });
+
+  const [stats, setStats] = useState({
+    systemHealth: "--",
+    ph: "--",
+    waterLevel: "--",
+    waterTemp: "--",
+  });
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        // Fetch latest readings for tank 1 and system health
+        const [readingsRes, healthRes] = await Promise.all([
+          fetch(`${API_URL}/sensors/readings/latest/1`),
+          fetch(`${API_URL}/system-health/1`),
+        ]);
+        const readingsData = await readingsRes.json();
+        const healthData = await healthRes.json();
+
+        const newStats = { ...stats };
+
+        if (healthData.success && healthData.data) {
+          newStats.systemHealth = healthData.data.overall_score;
+        }
+
+        if (readingsData.success && readingsData.data) {
+          for (const r of readingsData.data) {
+            if (r.type_name === "ph") newStats.ph = r.value;
+            if (r.type_name === "water_level") newStats.waterLevel = r.value + "%";
+            if (r.type_name === "temperature") newStats.waterTemp = r.value + "°C";
+          }
+        }
+
+        setStats(newStats);
+      } catch (err) {
+        console.error("Failed to fetch overview stats:", err);
+      }
+    }
+    fetchStats();
+  }, []);
 
   return (
     <>
@@ -59,8 +101,8 @@ export default function Overview() {
             margin: 0,
           }}
         >
-          Hi, Alexandra!{" "}
-         
+          Welcome!{" "}
+
         </h1>
 
         {/* Subtitle */}
@@ -101,10 +143,10 @@ export default function Overview() {
 
       {/* TOP STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title="System Health" value="21 324" />
-        <StatCard title="pH Level" value="8.1" />
-        <StatCard title="Water Level" value="22%" />
-        <StatCard title="Water Temp" value="31.2°C" />
+        <StatCard title="System Health" value={stats.systemHealth} />
+        <StatCard title="pH Level" value={stats.ph} />
+        <StatCard title="Water Level" value={stats.waterLevel} />
+        <StatCard title="Water Temp" value={stats.waterTemp} />
       </div>
 
       {/* Meters */}

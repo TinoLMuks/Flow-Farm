@@ -1,8 +1,27 @@
-import { Link, useNavigate } from "react-router-dom"; // Added useNavigate
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { FiHome, FiBarChart2, FiMessageCircle, FiSettings, FiHelpCircle, FiLogOut } from "react-icons/fi";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+
 export default function Sidebar() {
-  const navigate = useNavigate(); // Initialize the navigate function
+  const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    async function fetchUnread() {
+      try {
+        const res = await fetch(`${API_URL}/messages/unread-count/1`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          setUnreadCount(json.data.unread_count);
+        }
+      } catch (err) {
+        console.error("Failed to fetch unread count:", err);
+      }
+    }
+    fetchUnread();
+  }, []);
 
   return (
     <>
@@ -80,9 +99,11 @@ export default function Sidebar() {
             <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] text-gray-300 hover:text-white transition-colors duration-150 text-sm cursor-pointer relative">
               <FiMessageCircle size={15} />
               <span>Messages</span>
-              <span className="absolute right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                2
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                  {unreadCount}
+                </span>
+              )}
             </div>
           </nav>
         </div>
@@ -105,9 +126,9 @@ export default function Sidebar() {
             <span>Contact us</span>
           </div>
 
-          {/* Updated Log out button */}
-          <div 
-            onClick={() => navigate("/")} // Navigates to root (signin)
+          {/* Log out button */}
+          <div
+            onClick={() => navigate("/")}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,100,100,0.08)] hover:text-red-400 transition-colors duration-150 text-sm cursor-pointer mt-1"
           >
             <FiLogOut size={15} />
