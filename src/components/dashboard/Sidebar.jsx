@@ -112,10 +112,10 @@ export default function Sidebar() {
         <div className="px-4 pb-5 pt-4 border-t border-[rgba(175,208,110,0.12)] flex flex-col gap-1 relative z-10">
           <p className="text-[10px] font-medium text-[rgba(240,244,255,0.3)] tracking-[0.12em] uppercase px-2 mb-2">Account</p>
 
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] hover:text-white transition-colors duration-150 text-sm cursor-pointer">
+          <Link to="/dashboard/settings" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] hover:text-white transition-colors duration-150 text-sm">
             <FiSettings size={15} />
             <span>Settings</span>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] hover:text-white transition-colors duration-150 text-sm cursor-pointer">
             <FiHelpCircle size={15} />

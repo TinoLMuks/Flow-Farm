@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { useSocket } from "../../hooks/useSocket";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -51,8 +52,15 @@ function levelStatus(v) {
   return "Critical";
 }
 
+function tdsStatus(v) {
+  v = parseFloat(v);
+  if (v >= 200 && v <= 400) return "Optimal";
+  if ((v >= 150 && v < 200) || (v > 400 && v <= 500)) return "Warning";
+  return "Critical";
+}
+
 function ArcMeter({ value, min, max, status }) {
-  const t = (value - min) / (max - min);
+  const t = Math.min(Math.max((value - min) / (max - min), 0), 1);
   const endAng = START_ANG + t * TOTAL_ANG;
   const fullArc = arcPath(CX, CY, R, START_ANG, END_ANG);
   const activeArc = arcPath(CX, CY, R, START_ANG, endAng);
@@ -94,7 +102,7 @@ function ArcMeter({ value, min, max, status }) {
   );
 }
 
-function MeterCard({ label, value, unit, min, max, step, rangeLabel, onChange, getStatus }) {
+function MeterCard({ label, value, unit, min, max, step, rangeLabel, getStatus, isLive }) {
   const status = getStatus(value);
   const sc = getStatusStyle(status);
 
@@ -109,7 +117,29 @@ function MeterCard({ label, value, unit, min, max, step, rangeLabel, onChange, g
       alignItems: "center",
       gap: 12,
       fontFamily: "'DM Sans', sans-serif",
+      position: "relative",
     }}>
+      {/* Live indicator */}
+      {isLive && (
+        <div style={{
+          position: "absolute",
+          top: 12,
+          right: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}>
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#22c55e",
+            animation: "pulse 2s infinite",
+          }} />
+          <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 600 }}>LIVE</span>
+        </div>
+      )}
+
       <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em",
         textTransform: "uppercase", color: "#8a94a6", width: "100%", textAlign: "center" }}>
         {label}
@@ -139,30 +169,72 @@ function MeterCard({ label, value, unit, min, max, step, rangeLabel, onChange, g
         <span>{max}{unit === "°C" ? "°" : ""}</span>
       </div>
 
-      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 4 }}>
-        <label style={{ fontSize: 11, color: "#8a94a6" }}>Adjust</label>
-        <input type="range" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(parseFloat(e.target.value))} style={{ width: "100%" }} />
-      </div>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   );
 }
 
-export default function Meters() {
+function ConnectionStatus({ isConnected, lastUpdate }) {
+  return (
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      padding: "8px 16px",
+      background: isConnected ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+      borderRadius: 8,
+      marginBottom: 16,
+    }}>
+      <span style={{
+        width: 10,
+        height: 10,
+        borderRadius: "50%",
+        background: isConnected ? "#22c55e" : "#ef4444",
+      }} />
+      <span style={{
+        fontSize: 13,
+        color: isConnected ? "#16a34a" : "#dc2626",
+        fontWeight: 500,
+      }}>
+        {isConnected ? "Connected to sensors" : "Connecting to sensors..."}
+      </span>
+      {lastUpdate && isConnected && (
+        <span style={{ fontSize: 11, color: "#8a94a6" }}>
+          Last update: {lastUpdate.toLocaleTimeString()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function Meters({ tankId = 1 }) {
   const [ph,    setPh]    = useState(7.0);
   const [temp,  setTemp]  = useState(25);
   const [level, setLevel] = useState(65);
+  const [tds,   setTds]   = useState(300);
+  const [hasLiveData, setHasLiveData] = useState(false);
 
+  // Real-time socket connection
+  const { isConnected, latestReadings, lastUpdate } = useSocket(tankId);
+
+  // Initial fetch from API
   useEffect(() => {
     async function fetchReadings() {
       try {
-        const res = await fetch(`${API_URL}/sensors/readings/latest/1`);
+        const res = await fetch(`${API_URL}/sensors/readings/latest/${tankId}`);
         const json = await res.json();
         if (json.success && json.data) {
           for (const r of json.data) {
             if (r.type_name === "ph") setPh(parseFloat(r.value));
             if (r.type_name === "temperature") setTemp(parseFloat(r.value));
             if (r.type_name === "water_level") setLevel(parseFloat(r.value));
+            if (r.type_name === "tds") setTds(parseFloat(r.value));
           }
         }
       } catch (err) {
@@ -170,36 +242,59 @@ export default function Meters() {
       }
     }
     fetchReadings();
-  }, []);
+  }, [tankId]);
+
+  // Update from real-time socket data
+  useEffect(() => {
+    if (latestReadings && latestReadings.readings) {
+      const readings = latestReadings.readings;
+      if (readings.ph !== undefined) setPh(readings.ph);
+      if (readings.temperature !== undefined) setTemp(readings.temperature);
+      if (readings.water_level !== undefined) setLevel(readings.water_level);
+      if (readings.tds !== undefined) setTds(readings.tds);
+      setHasLiveData(true);
+    }
+  }, [latestReadings]);
 
   return (
     <div style={{ padding: "28px", background: "#f0f2f5", minHeight: "100%" }}>
-     <div style={{ marginBottom: 24, textAlign: "center" }}>
-  <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em",
-    color: "#1a2035", margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
-    Environment
-  </h1>
-  <p style={{ fontSize: 13, color: "#8a94a6", marginTop: 4,
-    fontFamily: "'DM Sans', sans-serif" }}>
-    Real-time sensor readings
-  </p>
-</div>
+      <div style={{ marginBottom: 24, textAlign: "center" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.03em",
+          color: "#1a2035", margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+          Environment
+        </h1>
+        <p style={{ fontSize: 13, color: "#8a94a6", marginTop: 4,
+          fontFamily: "'DM Sans', sans-serif" }}>
+          Real-time sensor readings
+        </p>
+      </div>
+
+      <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         <MeterCard
           label="pH Level" value={ph} unit="pH" min={5} max={9} step={0.1}
-          rangeLabel="Optimal: 6.5–7.5"
-          onChange={setPh} getStatus={phStatus}
+          rangeLabel="Optimal: 6.5-7.5"
+          getStatus={phStatus}
+          isLive={hasLiveData}
         />
         <MeterCard
           label="Water Temperature" value={temp} unit="°C" min={15} max={35} step={0.5}
-          rangeLabel="Optimal: 22–28°C"
-          onChange={setTemp} getStatus={tempStatus}
+          rangeLabel="Optimal: 22-28°C"
+          getStatus={tempStatus}
+          isLive={hasLiveData}
         />
         <MeterCard
           label="Water Level" value={level} unit="%" min={0} max={100} step={1}
-          rangeLabel="Optimal: 40–80%"
-          onChange={setLevel} getStatus={levelStatus}
+          rangeLabel="Optimal: 40-80%"
+          getStatus={levelStatus}
+          isLive={hasLiveData}
+        />
+        <MeterCard
+          label="TDS" value={tds} unit="ppm" min={0} max={800} step={1}
+          rangeLabel="Optimal: 200-400"
+          getStatus={tdsStatus}
+          isLive={hasLiveData}
         />
       </div>
     </div>
