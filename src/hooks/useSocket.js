@@ -2,11 +2,10 @@
  * useSocket Hook
  * 
  * Provides real-time WebSocket connection to the backend server.
- * Automatically handles connection, reconnection, and room management.
+ * Gracefully handles cases where the backend isn't available.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { io } from 'socket.io-client';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
@@ -20,117 +19,108 @@ export function useSocket(tankId = null) {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [latestReadings, setLatestReadings] = useState(null);
   const [latestAlert, setLatestAlert] = useState(null);
+  const [connectionError, setConnectionError] = useState(null);
 
-  // Initialize socket connection
+  // Initialize socket connection with dynamic import
   useEffect(() => {
-    // Create socket connection
-    socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-    });
+    let socket = null;
+    let mounted = true;
 
-    const socket = socketRef.current;
+    async function initSocket() {
+      try {
+        // Dynamically import socket.io-client
+        const { io } = await import('socket.io-client');
+        
+        if (!mounted) return;
 
-    // Connection handlers
-    socket.on('connect', () => {
-      console.log('[Socket] Connected:', socket.id);
-      setIsConnected(true);
-    });
+        // Create socket connection
+        socket = io(SOCKET_URL, {
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          timeout: 5000,
+        });
 
-    socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
-      setIsConnected(false);
-    });
+        socketRef.current = socket;
 
-    socket.on('connect_error', (error) => {
-      console.error('[Socket] Connection error:', error.message);
-      setIsConnected(false);
-    });
+        // Connection handlers
+        socket.on('connect', () => {
+          if (mounted) {
+            setIsConnected(true);
+            setConnectionError(null);
+          }
+        });
+
+        socket.on('disconnect', (reason) => {
+          if (mounted) {
+            setIsConnected(false);
+          }
+        });
+
+        socket.on('connect_error', (error) => {
+          if (mounted) {
+            setIsConnected(false);
+            setConnectionError(error.message);
+          }
+        });
+
+        // Tank room management
+        if (tankId) {
+          socket.emit('join-tank', tankId);
+        }
+
+        // Listen for sensor updates
+        socket.on('sensor-update', (data) => {
+          if (mounted) {
+            setLatestReadings(data);
+            setLastUpdate(new Date());
+          }
+        });
+
+        socket.on('global-sensor-update', (data) => {
+          if (mounted && !tankId) {
+            setLatestReadings(data);
+            setLastUpdate(new Date());
+          }
+        });
+
+        // Listen for alerts
+        socket.on('alert', (data) => {
+          if (mounted) {
+            setLatestAlert(data);
+          }
+        });
+
+        socket.on('global-alert', (data) => {
+          if (mounted && !tankId) {
+            setLatestAlert(data);
+          }
+        });
+
+      } catch (error) {
+        if (mounted) {
+          setConnectionError('Socket.IO not available');
+          setIsConnected(false);
+        }
+      }
+    }
+
+    initSocket();
 
     // Cleanup on unmount
     return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  // Join/leave tank room when tankId changes
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket || !isConnected) return;
-
-    if (tankId) {
-      socket.emit('join-tank', tankId);
-      console.log(`[Socket] Joining tank-${tankId}`);
-    }
-
-    return () => {
-      if (tankId) {
-        socket.emit('leave-tank', tankId);
-        console.log(`[Socket] Leaving tank-${tankId}`);
+      mounted = false;
+      if (socket) {
+        socket.disconnect();
       }
-    };
-  }, [tankId, isConnected]);
-
-  // Listen for sensor updates
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
-
-    // Tank-specific sensor update
-    const handleSensorUpdate = (data) => {
-      console.log('[Socket] Sensor update:', data);
-      setLatestReadings(data);
-      setLastUpdate(new Date());
-    };
-
-    // Global sensor update (for overview page)
-    const handleGlobalSensorUpdate = (data) => {
-      if (!tankId) {
-        // Only process global updates if not subscribed to a specific tank
-        handleSensorUpdate(data);
-      }
-    };
-
-    socket.on('sensor-update', handleSensorUpdate);
-    socket.on('global-sensor-update', handleGlobalSensorUpdate);
-
-    return () => {
-      socket.off('sensor-update', handleSensorUpdate);
-      socket.off('global-sensor-update', handleGlobalSensorUpdate);
-    };
-  }, [tankId]);
-
-  // Listen for alerts
-  useEffect(() => {
-    const socket = socketRef.current;
-    if (!socket) return;
-
-    const handleAlert = (data) => {
-      console.log('[Socket] Alert received:', data);
-      setLatestAlert(data);
-    };
-
-    const handleGlobalAlert = (data) => {
-      if (!tankId) {
-        handleAlert(data);
-      }
-    };
-
-    socket.on('alert', handleAlert);
-    socket.on('global-alert', handleGlobalAlert);
-
-    return () => {
-      socket.off('alert', handleAlert);
-      socket.off('global-alert', handleGlobalAlert);
     };
   }, [tankId]);
 
   // Method to emit custom events
   const emit = useCallback((event, data) => {
-    if (socketRef.current) {
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit(event, data);
     }
   }, []);
@@ -139,13 +129,15 @@ export function useSocket(tankId = null) {
   const on = useCallback((event, callback) => {
     if (socketRef.current) {
       socketRef.current.on(event, callback);
-      return () => socketRef.current.off(event, callback);
+      return () => socketRef.current?.off(event, callback);
     }
+    return () => {};
   }, []);
 
   return {
     socket: socketRef.current,
     isConnected,
+    connectionError,
     lastUpdate,
     latestReadings,
     latestAlert,
@@ -159,18 +151,33 @@ export function useSocket(tankId = null) {
  */
 export function useSocketStatus() {
   const [isConnected, setIsConnected] = useState(false);
-  const socketRef = useRef(null);
 
   useEffect(() => {
-    socketRef.current = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-    });
+    let socket = null;
+    let mounted = true;
 
-    socketRef.current.on('connect', () => setIsConnected(true));
-    socketRef.current.on('disconnect', () => setIsConnected(false));
+    async function init() {
+      try {
+        const { io } = await import('socket.io-client');
+        if (!mounted) return;
+
+        socket = io(SOCKET_URL, {
+          transports: ['websocket', 'polling'],
+          timeout: 5000,
+        });
+
+        socket.on('connect', () => mounted && setIsConnected(true));
+        socket.on('disconnect', () => mounted && setIsConnected(false));
+      } catch {
+        // Socket.IO not available
+      }
+    }
+
+    init();
 
     return () => {
-      socketRef.current.disconnect();
+      mounted = false;
+      socket?.disconnect();
     };
   }, []);
 

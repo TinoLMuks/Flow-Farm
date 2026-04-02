@@ -23,6 +23,7 @@ export default function Overview() {
   });
 
   const [systemStatus, setSystemStatus] = useState("running smoothly");
+  const [apiAvailable, setApiAvailable] = useState(true);
   
   // Real-time socket connection (global, not tank-specific)
   const { isConnected, latestReadings, latestAlert } = useSocket();
@@ -35,6 +36,11 @@ export default function Overview() {
           fetch(`${API_URL}/sensors/readings/latest/1`),
           fetch(`${API_URL}/system-health/1`),
         ]);
+        
+        if (!readingsRes.ok || !healthRes.ok) {
+          throw new Error('API not available');
+        }
+        
         const readingsData = await readingsRes.json();
         const healthData = await healthRes.json();
 
@@ -54,8 +60,17 @@ export default function Overview() {
         }
 
         setStats(newStats);
+        setApiAvailable(true);
       } catch (err) {
-        console.error("Failed to fetch overview stats:", err);
+        // Use demo values when API is not available
+        setStats({
+          systemHealth: "85%",
+          ph: "7.0",
+          waterLevel: "65%",
+          waterTemp: "25°C",
+          tds: "300 ppm",
+        });
+        setApiAvailable(false);
       }
     }
     fetchStats();
@@ -157,19 +172,27 @@ export default function Overview() {
             maxWidth: "420px",
           }}
         >
-          Your aquaponics system is{" "}
-          <span
-            style={{
-              color: systemStatus === "running smoothly" ? "rgba(175,208,110,1)" : "#ef4444",
-              fontWeight: 800,
-              background: systemStatus === "running smoothly" ? "rgba(175,208,110,0.15)" : "rgba(239,68,68,0.15)",
-              borderRadius: "4px",
-              padding: "1px 6px",
-            }}
-          >
-            {systemStatus}
-          </span>{" "}
-          {systemStatus === "running smoothly" ? "- here's today's overview." : "- check the alerts below."}
+          {!apiAvailable ? (
+            <>
+              <span style={{ color: "#f59e0b", fontWeight: 500 }}>Demo Mode</span> - Connect your backend to see real data
+            </>
+          ) : (
+            <>
+              Your aquaponics system is{" "}
+              <span
+                style={{
+                  color: systemStatus === "running smoothly" ? "rgba(175,208,110,1)" : "#ef4444",
+                  fontWeight: 800,
+                  background: systemStatus === "running smoothly" ? "rgba(175,208,110,0.15)" : "rgba(239,68,68,0.15)",
+                  borderRadius: "4px",
+                  padding: "1px 6px",
+                }}
+              >
+                {systemStatus}
+              </span>{" "}
+              {systemStatus === "running smoothly" ? "- here's today's overview." : "- check the alerts below."}
+            </>
+          )}
         </p>
       </div>
 
@@ -203,12 +226,14 @@ export default function Overview() {
             alignItems: "center",
             justifyContent: "center",
             fontSize: 20,
+            color: "#dc2626",
+            fontWeight: 700,
           }}>
             !
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, color: "#dc2626", fontSize: 14 }}>
-              New Alert: {latestAlert.tank_name}
+              New Alert: {latestAlert.tank_name || "Tank 1"}
             </div>
             <div style={{ color: "#7f1d1d", fontSize: 13 }}>
               {latestAlert.message}

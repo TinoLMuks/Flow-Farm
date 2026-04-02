@@ -6,7 +6,6 @@ require('dotenv').config();
 
 const { testConnection } = require('./src/config/db');
 const apiRoutes = require('./src/routes');
-const esp32Routes = require('./src/routes/esp32');
 const { notFoundHandler, errorHandler } = require('./src/middleware/errorHandler');
 
 const app = express();
@@ -28,11 +27,8 @@ app.use(express.json());
 // Make io accessible to routes
 app.set('io', io);
 
-// API routes
+// API routes (includes ESP32 endpoint at /api/esp32)
 app.use('/api', apiRoutes);
-
-// ESP32 dedicated endpoint (no auth, optimized for IoT)
-app.use('/api/esp32', esp32Routes);
 
 // 404 and error handling
 app.use(notFoundHandler);

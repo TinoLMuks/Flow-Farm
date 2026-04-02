@@ -179,7 +179,37 @@ function MeterCard({ label, value, unit, min, max, step, rangeLabel, getStatus, 
   );
 }
 
-function ConnectionStatus({ isConnected, lastUpdate }) {
+function ConnectionStatus({ isConnected, connectionError, lastUpdate }) {
+  // Show different states based on connection
+  if (connectionError) {
+    return (
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        padding: "8px 16px",
+        background: "rgba(251, 191, 36, 0.1)",
+        borderRadius: 8,
+        marginBottom: 16,
+      }}>
+        <span style={{
+          width: 10,
+          height: 10,
+          borderRadius: "50%",
+          background: "#f59e0b",
+        }} />
+        <span style={{
+          fontSize: 13,
+          color: "#d97706",
+          fontWeight: 500,
+        }}>
+          Real-time updates unavailable - showing cached data
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       display: "flex",
@@ -187,7 +217,7 @@ function ConnectionStatus({ isConnected, lastUpdate }) {
       justifyContent: "center",
       gap: 8,
       padding: "8px 16px",
-      background: isConnected ? "rgba(34, 197, 94, 0.1)" : "rgba(239, 68, 68, 0.1)",
+      background: isConnected ? "rgba(34, 197, 94, 0.1)" : "rgba(59, 130, 246, 0.1)",
       borderRadius: 8,
       marginBottom: 16,
     }}>
@@ -195,11 +225,12 @@ function ConnectionStatus({ isConnected, lastUpdate }) {
         width: 10,
         height: 10,
         borderRadius: "50%",
-        background: isConnected ? "#22c55e" : "#ef4444",
+        background: isConnected ? "#22c55e" : "#3b82f6",
+        animation: isConnected ? "none" : "pulse 1.5s infinite",
       }} />
       <span style={{
         fontSize: 13,
-        color: isConnected ? "#16a34a" : "#dc2626",
+        color: isConnected ? "#16a34a" : "#2563eb",
         fontWeight: 500,
       }}>
         {isConnected ? "Connected to sensors" : "Connecting to sensors..."}
@@ -209,6 +240,12 @@ function ConnectionStatus({ isConnected, lastUpdate }) {
           Last update: {lastUpdate.toLocaleTimeString()}
         </span>
       )}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -219,15 +256,17 @@ export default function Meters({ tankId = 1 }) {
   const [level, setLevel] = useState(65);
   const [tds,   setTds]   = useState(300);
   const [hasLiveData, setHasLiveData] = useState(false);
+  const [apiError, setApiError] = useState(false);
 
   // Real-time socket connection
-  const { isConnected, latestReadings, lastUpdate } = useSocket(tankId);
+  const { isConnected, connectionError, latestReadings, lastUpdate } = useSocket(tankId);
 
   // Initial fetch from API
   useEffect(() => {
     async function fetchReadings() {
       try {
         const res = await fetch(`${API_URL}/sensors/readings/latest/${tankId}`);
+        if (!res.ok) throw new Error('API not available');
         const json = await res.json();
         if (json.success && json.data) {
           for (const r of json.data) {
@@ -237,8 +276,10 @@ export default function Meters({ tankId = 1 }) {
             if (r.type_name === "tds") setTds(parseFloat(r.value));
           }
         }
+        setApiError(false);
       } catch (err) {
-        console.error("Failed to fetch meter readings:", err);
+        setApiError(true);
+        // Use demo values when API is not available
       }
     }
     fetchReadings();
@@ -265,11 +306,15 @@ export default function Meters({ tankId = 1 }) {
         </h1>
         <p style={{ fontSize: 13, color: "#8a94a6", marginTop: 4,
           fontFamily: "'DM Sans', sans-serif" }}>
-          Real-time sensor readings
+          {apiError ? "Demo data - connect your backend to see real readings" : "Real-time sensor readings"}
         </p>
       </div>
 
-      <ConnectionStatus isConnected={isConnected} lastUpdate={lastUpdate} />
+      <ConnectionStatus 
+        isConnected={isConnected} 
+        connectionError={connectionError}
+        lastUpdate={lastUpdate} 
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
         <MeterCard
