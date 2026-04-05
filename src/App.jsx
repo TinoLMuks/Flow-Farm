@@ -10,6 +10,7 @@ import CheckEmail from "./components/auth/CheckEmail";
 import Analytics from "./components/dashboard/analytics";
 import Overview from "./components/dashboard/Overview";
 import ThresholdSettings from "./components/dashboard/ThresholdSettings";
+import Messages from "./components/dashboard/Messages";
 function App() {
   return (
     <Routes>
@@ -28,6 +29,7 @@ function App() {
         <Route path="overview" element={<Overview />} /> 
         <Route path="analytics" element={<Analytics />} />
         <Route path="settings" element={<ThresholdSettings />} />
+        <Route path="messages" element={<Messages />} />
             
       </Route>
 

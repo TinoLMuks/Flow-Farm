@@ -11,16 +11,25 @@ export default function Sidebar() {
   useEffect(() => {
     async function fetchUnread() {
       try {
-        const res = await fetch(`${API_URL}/messages/unread-count/1`);
-        const json = await res.json();
-        if (json.success && json.data) {
-          setUnreadCount(json.data.unread_count);
+        // Fetch unresolved alerts count
+        const alertRes = await fetch(`${API_URL}/alerts?limit=100`);
+        const alertJson = await alertRes.json();
+        if (alertJson.success && alertJson.data) {
+          // Count alerts that are not resolved or acknowledged
+          const unresolvedCount = alertJson.data.filter(
+            a => !a.resolution_status || (a.resolution_status !== 'resolved' && a.resolution_status !== 'acknowledged')
+          ).length;
+          setUnreadCount(unresolvedCount);
         }
       } catch (err) {
         console.error("Failed to fetch unread count:", err);
       }
     }
     fetchUnread();
+    
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -96,7 +105,7 @@ export default function Sidebar() {
               <span>Analytics</span>
             </Link>
 
-            <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] text-gray-300 hover:text-white transition-colors duration-150 text-sm cursor-pointer relative">
+            <Link to="/dashboard/messages" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.06)] text-gray-300 hover:text-white transition-colors duration-150 text-sm relative">
               <FiMessageCircle size={15} />
               <span>Messages</span>
               {unreadCount > 0 && (
@@ -104,7 +113,7 @@ export default function Sidebar() {
                   {unreadCount}
                 </span>
               )}
-            </div>
+            </Link>
           </nav>
         </div>
 
