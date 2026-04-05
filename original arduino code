@@ -1,0 +1,260 @@
+/*
+ * ============================================================
+ *  FLOWFARM AQUAPONICS MONITORING SYSTEM
+ *  ESP32 + Blynk + pH + TDS + DS18B20 + Analog Water Level
+ * ============================================================
+ *
+ *  HARDWARE CONNECTIONS:
+ *  ─────────────────────
+ *  DS18B20 Temp      → G4    (+ 4.7kΩ pull-up between DATA and 3V3)
+ *  pH Sensor (Po)    → G32   (analog input)
+ *  TDS Sensor (A)    → G34   (analog input — G35 was faulty, use G34)
+ *  Water Level (S)   → G33   (analog input, S/+/- sensor)
+ *
+ *  BLYNK VIRTUAL PINS:
+ *  ───────────────────
+ *  V0 → Temperature (°C)
+ *  V1 → pH value
+ *  V2 → TDS (ppm)
+ *  V3 → Water level (%)
+ *  V4 → Alerts (Event Log widget)
+ *
+ *  IMPORTANT: Regenerate your Blynk Auth Token — the old one
+ *  was shared publicly. Do this in blynk.cloud → Device → 
+ *  Device Info → Generate new token.
+ * ============================================================
+ */
+
+// ── Blynk config ──────────────────────────────────────────────
+#define BLYNK_TEMPLATE_ID   "TMPL2Y7mf7Ifz"
+#define BLYNK_TEMPLATE_NAME "FlowFarm"
+#define BLYNK_AUTH_TOKEN    "PASTE_YOUR_NEW_TOKEN_HERE"  // regenerate this!
+
+#include <WiFi.h>
+#include <BlynkSimpleEsp32.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// ── WiFi ───────────────────────────────────────────────────────
+const char* WIFI_SSID = "iPhone";
+const char* WIFI_PASS = "12345678";
+
+// ── Pin definitions ────────────────────────────────────────────
+#define PIN_DS18B20    4    // Temperature — 1-Wire data
+#define PIN_PH         32   // pH — analog signal (moved from G34)
+#define PIN_TDS        34   // TDS — analog signal (G35 faulty, using G34)
+#define PIN_LEVEL      33   // Water level — analog S pin
+
+// ── Blynk virtual pins ─────────────────────────────────────────
+#define VPIN_TEMP    V0
+#define VPIN_PH      V1
+#define VPIN_TDS     V2
+#define VPIN_LEVEL   V3
+
+// ── pH calibration ─────────────────────────────────────────────
+// Measure these voltages using buffer solutions and update:
+const float PH_VOLTAGE_AT_7 = 2.20;
+const float PH_VOLTAGE_AT_4 = 3.00;
+
+// ── TDS calibration ────────────────────────────────────────────
+const float TDS_FACTOR = 0.5;
+
+// ── Water level calibration ────────────────────────────────────
+// Run water level test sketch, note these values, update here:
+const int LEVEL_RAW_MIN = 640;   // your actual dry reading
+const int LEVEL_RAW_MAX = 3200;  // update this after fully submerging
+
+// ── Alert thresholds ───────────────────────────────────────────
+const float PH_MIN    = 6.0;
+const float PH_MAX    = 7.0;
+const float TDS_MAX   = 400.0;
+const float TEMP_MIN  = 20.0;
+const float TEMP_MAX  = 28.0;
+const float LEVEL_MIN = 20.0;   // % — alert if water drops below 20%
+
+// ── Sensor objects ─────────────────────────────────────────────
+OneWire oneWire(PIN_DS18B20);
+DallasTemperature tempSensor(&oneWire);
+BlynkTimer timer;
+
+// ── State ──────────────────────────────────────────────────────
+float temperature = 0.0;
+float phValue     = 0.0;
+float tdsValue    = 0.0;
+float waterLevel  = 0.0;
+
+// ══════════════════════════════════════════════════════════════
+//  SENSOR FUNCTIONS
+// ══════════════════════════════════════════════════════════════
+
+float readTemperature() {
+  tempSensor.requestTemperatures();
+  float t = tempSensor.getTempCByIndex(0);
+  if (t == DEVICE_DISCONNECTED_C) {
+    Serial.println("[TEMP] ERROR: sensor disconnected");
+    return -999.0;
+  }
+  Serial.print("[TEMP] "); Serial.print(t, 2); Serial.println(" C");
+  return t;
+}
+
+float readPH() {
+  long sum = 0;
+  for (int i = 0; i < 30; i++) {
+    sum += analogRead(PIN_PH);
+    delay(10);
+  }
+  float avg     = sum / 30.0;
+  float voltage = avg * (3.3 / 4095.0);
+  float slope   = 3.0 / (PH_VOLTAGE_AT_4 - PH_VOLTAGE_AT_7);
+  float ph      = 7.0 + (PH_VOLTAGE_AT_7 - voltage) * slope;
+  ph = constrain(ph, 0.0, 14.0);
+
+  Serial.print("[pH]  voltage="); Serial.print(voltage, 3);
+  Serial.print("V  pH="); Serial.println(ph, 2);
+  return ph;
+}
+
+float readTDS(float currentTemp) {
+  long sum = 0;
+  for (int i = 0; i < 30; i++) {
+    sum += analogRead(PIN_TDS);
+    delay(10);
+  }
+  float avg         = sum / 30.0;
+  float voltage     = avg * (3.3 / 4095.0);
+  float tempCoeff   = 1.0 + 0.02 * (currentTemp - 25.0);
+  float compVoltage = voltage / tempCoeff;
+  float tds = (133.42 * compVoltage * compVoltage * compVoltage
+             - 255.86 * compVoltage * compVoltage
+             + 857.39 * compVoltage) * TDS_FACTOR;
+  tds = max(tds, 0.0f);
+
+  Serial.print("[TDS] voltage="); Serial.print(voltage, 3);
+  Serial.print("V  TDS="); Serial.print(tds, 0); Serial.println(" ppm");
+  return tds;
+}
+
+float readWaterLevel() {
+  long sum = 0;
+  for (int i = 0; i < 20; i++) {
+    sum += analogRead(PIN_LEVEL);
+    delay(5);
+  }
+  float raw     = sum / 20.0;
+  float percent = (float)(raw - LEVEL_RAW_MIN) /
+                  (float)(LEVEL_RAW_MAX - LEVEL_RAW_MIN) * 100.0;
+  percent = constrain(percent, 0.0, 100.0);
+
+  Serial.print("[LVL] raw="); Serial.print(raw, 0);
+  Serial.print("  level="); Serial.print(percent, 1); Serial.println("%");
+  return percent;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ALERTS
+// ══════════════════════════════════════════════════════════════
+
+void checkAlerts() {
+  String msg = "";
+
+  if (temperature != -999.0 && temperature < TEMP_MIN)
+    msg += "COLD: " + String(temperature, 1) + "C  ";
+  if (temperature != -999.0 && temperature > TEMP_MAX)
+    msg += "HOT: " + String(temperature, 1) + "C  ";
+  if (phValue < PH_MIN)
+    msg += "pH LOW: " + String(phValue, 2) + "  ";
+  if (phValue > PH_MAX)
+    msg += "pH HIGH: " + String(phValue, 2) + "  ";
+  if (tdsValue > TDS_MAX)
+    msg += "TDS HIGH: " + String(tdsValue, 0) + "ppm  ";
+  if (waterLevel < LEVEL_MIN)
+    msg += "WATER LOW: " + String(waterLevel, 1) + "%  ";
+
+  if (msg.length() > 0) {
+    Serial.println(">>> ALERT: " + msg);
+    Blynk.logEvent("alert", msg);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN DATA FUNCTION (called every 5 seconds by timer)
+// ══════════════════════════════════════════════════════════════
+
+void sendData() {
+  Serial.println("\n========== READING SENSORS ==========");
+
+  temperature = readTemperature();
+  phValue     = readPH();
+  tdsValue    = readTDS(temperature);
+  waterLevel  = readWaterLevel();
+
+  if (Blynk.connected()) {
+    Blynk.virtualWrite(VPIN_TEMP,  temperature);
+    Blynk.virtualWrite(VPIN_PH,    phValue);
+    Blynk.virtualWrite(VPIN_TDS,   tdsValue);
+    Blynk.virtualWrite(VPIN_LEVEL, waterLevel);
+    checkAlerts();
+    Serial.println("Sent to Blynk OK");
+  } else {
+    Serial.println("Blynk not connected — data not sent");
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SETUP
+// ══════════════════════════════════════════════════════════════
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n\n=== FLOWFARM STARTING ===");
+
+  // Temperature sensor — init FIRST before any ADC setup
+  tempSensor.begin();
+  Serial.print("DS18B20 devices found: ");
+  Serial.println(tempSensor.getDeviceCount());
+
+  // ADC config — set per-pin only, not globally
+  // Global analogSetAttenuation interferes with DS18B20 on G4
+  analogReadResolution(12);
+  analogSetPinAttenuation(PIN_PH,    ADC_11db);
+  analogSetPinAttenuation(PIN_TDS,   ADC_11db);
+  analogSetPinAttenuation(PIN_LEVEL, ADC_11db);
+
+  // Connect WiFi
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    Serial.print(".");
+    tries++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi connected — IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\nWiFi FAILED — running offline, data won't send to Blynk");
+  }
+
+  // Connect Blynk
+  Blynk.config(BLYNK_AUTH_TOKEN);
+  Blynk.connect(3000);  // 3 second timeout — won't hang forever if Blynk is down
+
+  // Timer — reads all sensors and sends every 5 seconds
+  timer.setInterval(5000L, sendData);
+
+  Serial.println("=== SETUP DONE — MONITORING STARTED ===\n");
+}
+
+// ══════════════════════════════════════════════════════════════
+//  LOOP — keep this clean, no delays here
+// ══════════════════════════════════════════════════════════════
+
+void loop() {
+  Blynk.run();   // handles Blynk connection
+  timer.run();   // fires sendData() every 5 seconds
+  // NO delay() here — it breaks Blynk's connection maintenance
+}
